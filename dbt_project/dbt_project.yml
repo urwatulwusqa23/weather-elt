@@ -1,0 +1,17 @@
+name: weather_dbt
+version: '1.0.0'
+config-version: 2
+
+profile: weather
+
+model-paths: ["models"]
+test-paths: ["tests"]
+
+models:
+  weather_dbt:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table

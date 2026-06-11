@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.env
+airflow/logs/
+dbt_project/target/
+dbt_project/dbt_packages/
+postgres_data/
+*.egg-info/
