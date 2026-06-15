@@ -1,102 +1,120 @@
 # Weather ETL Pipeline
 
-An end-to-end ETL pipeline that ingests daily weather data for five global cities, loads it into PostgreSQL, and transforms it through a dbt staging/marts model — orchestrated by Apache Airflow and fully dockerized.
+An end-to-end data pipeline that ingests daily weather data for five Pakistani cities, transforms it with dbt, orchestrates everything with Apache Airflow, and visualises the results in a live Streamlit dashboard — all running in Docker.
 
 ## Architecture
 
 ```
-Open-Meteo API → Python (async ingestion) → PostgreSQL (raw)
-                                                  │
-                                          dbt (staging → marts)
-                                                  │
-                                       Airflow (daily orchestration)
+Open-Meteo API
+      │
+      ▼
+Python async ingestion (httpx + psycopg2)
+      │
+      ▼
+PostgreSQL  ──  raw.weather_data
+      │
+      ▼
+dbt  ──  staging.stg_weather_raw  ──►  marts.daily_weather_summary
+                                   ──►  marts.city_weather_comparison
+      │
+      ▼
+Apache Airflow (daily DAG orchestration)
+      │
+      ▼
+Streamlit Dashboard (live pipeline status + weather charts)
 ```
 
-**Pipeline steps (run daily via Airflow):**
-1. **Ingest** — async Python fetches 7-day weather history for 5 cities from the Open-Meteo API
-2. **Validate** — checks that recent data landed in `raw.weather_data`
-3. **dbt run** — builds staging views and mart tables
-4. **dbt test** — runs data quality checks
+**Pipeline tasks (run daily):**
+
+| # | Task | What it does |
+|---|------|--------------|
+| 1 | `ingest_weather_data` | Async-fetches 7-day weather history for 5 cities from Open-Meteo |
+| 2 | `validate_raw_data` | Asserts recent rows exist in `raw.weather_data` |
+| 3 | `dbt_run` | Builds staging view + mart tables |
+| 4 | `dbt_test` | Runs data-quality tests (e.g. temp range sanity check) |
+
+## Cities tracked
+
+Karachi · Lahore · Islamabad · Peshawar · Quetta
 
 ## Stack
 
-- **Python** (httpx, psycopg2) — async API ingestion
-- **PostgreSQL** — storage, 3-layer schema (`raw` / `staging` / `marts`)
-- **dbt** — transformation layer (CTEs, window functions, tests)
-- **Apache Airflow** — daily DAG orchestration
-- **Docker Compose** — runs Postgres + Airflow services
+| Layer | Technology |
+|---|---|
+| Ingestion | Python 3.10+, httpx (async), psycopg2 |
+| Storage | PostgreSQL 15 (3-layer schema: raw / staging / marts) |
+| Transformation | dbt-core 1.8+, dbt-postgres |
+| Orchestration | Apache Airflow 2.9 |
+| Infrastructure | Docker Compose |
+| Dashboard | Streamlit, Plotly, SQLAlchemy |
 
 ## Project Structure
 
 ```
 weather-etl/
-├── .env                          # Airflow/Postgres environment config (not committed)
-├── docker-compose.yml            # Service orchestration
-├── init_db.sql                   # DB schema bootstrap
-├── requirements.txt              # Python dependencies
+├── docker-compose.yml            # Postgres + Airflow services
+├── init_db.sql                   # DB + schema bootstrap (raw/staging/marts)
+├── .env                          # Secrets — not committed
+├── requirements.txt
+│
 ├── airflow/
+│   ├── Dockerfile                # Airflow image with dbt installed
 │   └── dags/
-│       └── weather_etl_dag.py    # Daily DAG: ingest -> validate -> dbt run -> dbt test
+│       └── weather_etl_dag.py    # 4-task daily DAG
+│
 ├── ingestion/
-│   ├── __init__.py
-│   └── extract.py                # Async fetch + upsert into raw.weather_data
-└── dbt_project/
-    ├── dbt_project.yml
-    ├── profiles.yml
-    ├── models/
-    │   ├── staging/
-    │   │   └── stg_weather_raw.sql       # Cleaning, unit conversion, error flagging
-    │   └── marts/
-    │       ├── daily_weather_summary.sql      # Rolling averages, monthly rankings
-    │       └── city_weather_comparison.sql    # Cross-city aggregates
-    └── tests/
-        └── assert_temp_range.sql          # Fails on physically impossible temps
+│   └── extract.py                # Async fetch → upsert into raw.weather_data
+│
+├── dbt_project/
+│   ├── profiles.yml
+│   ├── dbt_project.yml
+│   ├── models/
+│   │   ├── staging/
+│   │   │   └── stg_weather_raw.sql          # Type casting, °C→°F, error flagging
+│   │   └── marts/
+│   │       ├── daily_weather_summary.sql    # 7-day rolling avg, monthly hottest-day rank
+│   │       └── city_weather_comparison.sql  # Cross-city aggregates
+│   └── tests/
+│       └── assert_temp_range.sql            # Fails on temps outside −90°C / +60°C
+│
+└── dashboard/
+    ├── app.py                    # Streamlit dashboard
+    └── requirements.txt
 ```
 
 ## Data Model
 
-| Schema | Table/View | Description |
+| Schema | Object | Description |
 |---|---|---|
-| `raw` | `weather_data` | Raw daily weather per city, upserted on `(city, date)` |
-| `staging` | `stg_weather_raw` | Cleaned types, °C/°F conversion, temp range, error flag |
-| `marts` | `daily_weather_summary` | Per-city daily metrics + 7-day rolling avg + monthly hottest-day rank |
-| `marts` | `city_weather_comparison` | Aggregated stats per city (avg/min/max temp, rainfall, wind) |
-
-**Cities tracked:** London, New York, Tokyo, Sydney, Dubai
+| `raw` | `weather_data` | Raw daily readings, upserted on `(city, date)` |
+| `staging` | `stg_weather_raw` | Cleaned types, unit conversions, `has_temp_error` flag |
+| `marts` | `daily_weather_summary` | Daily metrics + 7-day rolling avg + monthly hottest-day rank |
+| `marts` | `city_weather_comparison` | All-time aggregates per city (avg/max/min temp, rainfall, wind) |
 
 ## Setup
 
 ### Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
 - Python 3.10+
 - Git
 
-### 1. Clone and configure
+### 1. Clone the repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/weather-etl.git
+git clone https://github.com/urwatulwusqa23/weather-etl.git
 cd weather-etl
-python -m venv venv
-```
-
-Activate the virtual environment:
-- Windows: `venv\Scripts\activate`
-- macOS/Linux: `source venv/bin/activate`
-
-```bash
-pip install -r requirements.txt
 ```
 
 ### 2. Create `.env`
 
-Generate a Fernet key:
+Generate a Fernet key first:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-Create a `.env` file in the project root:
+Then create `.env` in the project root:
 
 ```env
 POSTGRES_USER=airflow
@@ -106,14 +124,15 @@ POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 
 AIRFLOW__CORE__EXECUTOR=LocalExecutor
-AIRFLOW__CORE__FERNET_KEY=<paste your generated key here>
+AIRFLOW__CORE__FERNET_KEY=<paste your generated key>
 AIRFLOW__CORE__LOAD_EXAMPLES=False
 AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
 ```
 
-### 3. Start the stack
+### 3. Build and start the stack
 
 ```bash
+docker compose build --no-cache
 docker compose up -d
 ```
 
@@ -125,51 +144,65 @@ docker compose logs -f airflow-webserver
 
 Look for `Listening at: 0.0.0.0:8080`, then press `Ctrl+C`.
 
-> **Port conflict?** If port 8080 is already in use, either free it (`netstat -ano | findstr :8080` on Windows to find the process) or change the port mapping in `docker-compose.yml` to e.g. `"8081:8080"` and use that port below.
+> **Port note:** The Postgres container maps to host port `5434` (to avoid conflicts with any local Postgres instances on 5432/5433). Airflow UI is on `http://localhost:8081`.
 
-### 4. Run the pipeline
+### 4. Trigger the pipeline
 
-Open the Airflow UI at [http://localhost:8080](http://localhost:8080) (default credentials `admin` / `admin`).
+Open **[http://localhost:8081](http://localhost:8081)** (login: `admin` / `admin`).
 
-Find `weather_etl_pipeline`, toggle it **ON**, and trigger it manually for the first run.
+Find `weather_etl_pipeline`, toggle it **On**, and hit the ▶ button to trigger a manual run. All four task boxes should turn green.
 
-### 5. Query the results
+### 5. Run the dashboard
+
+```bash
+cd dashboard
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Open **[http://localhost:8501](http://localhost:8501)**. The dashboard shows:
+
+- Pipeline status table (last 5 DAG runs, colour-coded per task state)
+- Task duration bar chart for the latest run
+- Smart failure alerts (distinguishes root failures from blocked downstream tasks)
+- Raw data overview metrics
+- Temperature trends per city (max / min / avg tabs)
+- City comparison charts (avg temps, total rainfall)
+- Precipitation & wind speed dual-axis chart per city
+
+### 6. Query the data directly
 
 ```bash
 docker exec -it weather-etl-postgres-1 psql -U airflow -d weather
 ```
 
 ```sql
--- Raw data
-SELECT city, date, temp_max, temp_min
+-- Raw readings
+SELECT city, date, temp_max, temp_min, precipitation
 FROM raw.weather_data
-ORDER BY date DESC LIMIT 10;
+ORDER BY date DESC
+LIMIT 10;
 
--- City comparison
+-- City comparison (mart)
 SELECT * FROM marts.city_weather_comparison;
 
--- Rolling averages
+-- Rolling 7-day average (mart)
 SELECT city, date, temp_max_c, rolling_7d_avg_temp_max
 FROM marts.daily_weather_summary
-WHERE city = 'London'
+WHERE city = 'Karachi'
 ORDER BY date DESC;
 ```
 
 ## Notes
 
-- The DAG runs daily (`@daily` schedule) and pulls a 7-day rolling window of weather history, upserting on `(city, date)` to avoid duplicates.
-- `stg_weather_raw` flags rows where `temp_max < temp_min` as `has_temp_error`; these are excluded from mart models.
-- `assert_temp_range.sql` is a dbt test that fails if any temperature falls outside physically plausible bounds (-90°C to 60°C).
-- `.env` and `postgres_data/` (Docker volume) are excluded from version control via `.gitignore`.
+- The DAG uses `catchup=False` and runs `@daily`. It fetches a 7-day rolling window from Open-Meteo and upserts on `(city, date)` — re-runs are safe.
+- `stg_weather_raw` flags rows where `temp_max < temp_min` as `has_temp_error = TRUE`. Mart models filter these out.
+- The Streamlit dashboard connects to both databases: `localhost:5434/airflow` for pipeline status and `localhost:5434/weather` for weather data. Override with `AIRFLOW_DSN` and `WEATHER_DSN` env vars if needed.
+- dbt version must be `>=1.8.0,<2.0.0`. Version `1.7.x` has a `KeyError: 'javascript'` bug; `2.0.0-alpha.1` dropped the postgres adapter entirely.
 
 ## Stopping the stack
 
 ```bash
-docker compose down
-```
-
-Add `-v` to also remove the Postgres data volume:
-
-```bash
-docker compose down -v
+docker compose down          # stop and remove containers
+docker compose down -v       # also wipe the Postgres data volume
 ```
