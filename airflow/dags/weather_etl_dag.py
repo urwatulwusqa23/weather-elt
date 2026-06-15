@@ -1,12 +1,13 @@
 from __future__ import annotations
 from datetime import timedelta
+import sys
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.utils.dates import days_ago
 
 PG_CONN = (
-    "postgresql+psycopg2://airflow:airflow@postgres:5432/weather"
+    "postgresql://airflow:airflow@postgres:5432/weather"
 )
 DBT_DIR = "/opt/airflow/dbt_project"
 
@@ -18,6 +19,9 @@ default_args = {
 
 
 def ingest_weather(**ctx):
+    # Make mounted project modules importable in Airflow worker runtime.
+    if "/opt/airflow" not in sys.path:
+        sys.path.append("/opt/airflow")
     from ingestion.extract import run_ingestion
     n = run_ingestion(conn_str=PG_CONN)
     print(f"Ingested {n} records")

@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
 CITIES: list[dict[str, Any]] = [
-    {"name": "London",   "lat": 51.5074,  "lon": -0.1278},
-    {"name": "New York", "lat": 40.7128,  "lon": -74.0060},
-    {"name": "Tokyo",    "lat": 35.6762,  "lon": 139.6503},
-    {"name": "Sydney",   "lat": -33.8688, "lon": 151.2093},
-    {"name": "Dubai",    "lat": 25.2048,  "lon": 55.2708},
+    {"name": "Karachi",    "lat": 24.8607, "lon": 67.0011},
+    {"name": "Lahore",     "lat": 31.5204, "lon": 74.3587},
+    {"name": "Islamabad",  "lat": 33.6844, "lon": 73.0479},
+    {"name": "Peshawar",   "lat": 34.0151, "lon": 71.5249},
+    {"name": "Quetta",     "lat": 30.1798, "lon": 66.9750},
 ]
 
 DAILY_VARS = [
