@@ -1,6 +1,7 @@
 # Weather ETL Pipeline
 
 An end-to-end data pipeline that ingests daily weather data for five Pakistani cities, transforms it with dbt, orchestrates everything with Apache Airflow, and visualises the results in a live Streamlit dashboard — all running in Docker.
+<img width="3590" height="1675" alt="image" src="https://github.com/user-attachments/assets/db490bdc-a8f1-4e3f-a40d-fdfd63491682" />
 
 ## Architecture
 
@@ -35,7 +36,8 @@ Streamlit Dashboard (live pipeline status + weather charts)
 
 ## Cities tracked
 
-Karachi · Lahore · Islamabad · Peshawar · Quetta
+Karachi · Lahore · Islamabad · Peshawar · Quetta . london . dubai .tokyo 
+
 
 ## Stack
 
@@ -151,6 +153,7 @@ Look for `Listening at: 0.0.0.0:8080`, then press `Ctrl+C`.
 Open **[http://localhost:8081](http://localhost:8081)** (login: `admin` / `admin`).
 
 Find `weather_etl_pipeline`, toggle it **On**, and hit the ▶ button to trigger a manual run. All four task boxes should turn green.
+<img width="3837" height="1860" alt="image" src="https://github.com/user-attachments/assets/fbeafa45-e8c8-4217-ae2b-25aae265da32" />
 
 ### 5. Run the dashboard
 
@@ -169,6 +172,11 @@ Open **[http://localhost:8501](http://localhost:8501)**. The dashboard shows:
 - Temperature trends per city (max / min / avg tabs)
 - City comparison charts (avg temps, total rainfall)
 - Precipitation & wind speed dual-axis chart per city
+  <img width="3570" height="1435" alt="image" src="https://github.com/user-attachments/assets/23b52403-8980-4531-a38e-f90f4da7da06" />
+
+  <img width="3590" height="1675" alt="image" src="https://github.com/user-attachments/assets/1198675e-dab0-46fa-a462-60aa71c965d6" />
+
+<img width="3680" height="1192" alt="image" src="https://github.com/user-attachments/assets/1c95f824-cb10-459e-be04-f3396ab74803" />
 
 ### 6. Query the data directly
 
